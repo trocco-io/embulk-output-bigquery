@@ -207,6 +207,13 @@ module Embulk
             Proc.new {|val|
               next nil if val.nil?
               with_typecast_error(val) do |val|
+                TimeWithZone.set_zone_offset(Time.parse(val), zone_offset).strftime("%Y-%m-%d %H:%M:%S.%6N")
+              end
+            }
+          when 'DATETIME'
+            Proc.new {|val|
+              next nil if val.nil?
+              with_typecast_error(val) do |val|
                 TimeWithZone.set_zone_offset(Time.parse(val), zone_offset).strftime("%Y-%m-%d")
               end
             }
@@ -251,6 +258,11 @@ module Embulk
             Proc.new {|val|
               next nil if val.nil?
               val.localtime(zone_offset).strftime("%Y-%m-%d")
+            }
+          when 'DATETIME'
+            Proc.new {|val|
+              next nil if val.nil?
+              val.localtime(zone_offset).strftime("%Y-%m-%d %H:%M:%S.%6N")
             }
           else
             raise NotSupportedType, "cannot take column type #{type} for timestamp column"
