@@ -230,6 +230,36 @@ module Embulk
           Bigquery.transaction(config, schema, processor_count, &control)
         end
       end
+
+      sub_test_case "merge" do
+        def test_merge
+          config = least_config.merge('mode' => 'merge')
+          task = Bigquery.configure(config, schema, processor_count)
+          any_instance_of(BigqueryClient) do |obj|
+            mock(obj).get_dataset(config['dataset'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
+            mock(obj).create_table_if_not_exists(config['table'])
+            mock(obj).merge(config['temp_table'], config['table'], task['merge_keys'], task['merge_rule'])
+            mock(obj).delete_table(config['temp_table'])
+            mock(obj).patch_table
+          end
+          Bigquery.transaction(config, schema, processor_count, &control)
+        end
+
+        def test_merge_with_partitioning
+          config = least_config.merge('mode' => 'merge', 'table' => 'table$20160929', 'auto_create_table' => true)
+          task = Bigquery.configure(config, schema, processor_count)
+          any_instance_of(BigqueryClient) do |obj|
+            mock(obj).get_dataset(config['dataset'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
+            mock(obj).create_table_if_not_exists(config['table'])
+            mock(obj).merge(config['temp_table'], config['table'], task['merge_keys'], task['merge_rule'])
+            mock(obj).delete_table(config['temp_table'])
+            mock(obj).patch_table
+          end
+          Bigquery.transaction(config, schema, processor_count, &control)
+        end
+      end
     end
   end
 end

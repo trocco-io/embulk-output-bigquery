@@ -544,6 +544,125 @@ module Embulk
             with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
           end
         end
+
+        def merge(source_table, target_table, merge_keys, merge_rule)
+          columns = @schema.map { |column| column[:name] }
+          query = <<~EOD
+            MERGE `#{@dataset}`.`#{target_table}` T
+            USING `#{@dataset}`.`#{source_table}` S
+               ON #{join_merge_keys(merge_keys.empty? ? merge_keys(target_table) : merge_keys)}
+             WHEN MATCHED THEN
+               UPDATE SET #{join_merge_rule_or_columns(merge_rule, columns)}
+             WHEN NOT MATCHED THEN
+               INSERT (#{join_columns(columns)})
+               VALUES (#{join_columns(columns)})
+          EOD
+          Embulk.logger.info { "embulk-output-bigquery: Execute query... #{query.gsub(/\s+/, ' ')}" }
+          execute_query(query)
+        end
+
+        def merge_keys(table)
+          query = <<~EOD
+            SELECT
+              KCU.COLUMN_NAME
+            FROM
+              `#{@dataset}`.INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+            JOIN
+              `#{@dataset}`.INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
+            ON
+              KCU.CONSTRAINT_CATALOG = TC.CONSTRAINT_CATALOG AND
+              KCU.CONSTRAINT_SCHEMA = TC.CONSTRAINT_SCHEMA AND
+              KCU.CONSTRAINT_NAME = TC.CONSTRAINT_NAME AND
+              KCU.TABLE_CATALOG = TC.TABLE_CATALOG AND
+              KCU.TABLE_SCHEMA = TC.TABLE_SCHEMA AND
+              KCU.TABLE_NAME = TC.TABLE_NAME
+            WHERE
+              TC.TABLE_NAME = '#{table}' AND
+              TC.CONSTRAINT_TYPE = 'PRIMARY KEY'
+            ORDER BY
+              KCU.ORDINAL_POSITION
+          EOD
+          rows = []
+          run_query(query) { |response| rows.concat(response[:rows] || []) }
+          rows.flat_map { |row| row[:f] }.map { |cell| cell[:v] }
+        end
+
+        def run_query(query, &block)
+          response = execute_query(query)
+          response = query_results(response, &block) while response
+        end
+
+        def query_results(response)
+          with_job_retry do
+            begin
+              job_id = response[:job_reference][:job_id]
+              page_token = response[:page_token].to_s unless response[:page_token].to_s.empty?
+              response = with_network_retry { client.get_job_query_results(@project, job_id, page_token: page_token) }.to_h
+              yield response
+              response unless response[:page_token].to_s.empty?
+            rescue Google::Apis::ServerError, Google::Apis::ClientError, Google::Apis::AuthorizationError => e
+              response = {status_code: e.status_code, message: e.message, error_class: e.class}
+              Embulk.logger.error {
+                "embulk-output-bigquery: get_job_query_results(#{@project}, #{job_id}), response:#{response}"
+              }
+              raise Error, "failed to get query results, response:#{response}"
+            end
+          end
+        end
+
+        def join_merge_keys(merge_keys)
+          raise "merge key or primary key is required" if merge_keys.empty?
+
+          merge_keys.map { |merge_key| "T.`#{merge_key}` = S.`#{merge_key}`" }.join(" AND ")
+        end
+
+        def join_merge_rule_or_columns(merge_rule, columns)
+          merge_rule_or_columns = merge_rule.empty? ? columns.map { |column| "T.`#{column}` = S.`#{column}`" } : merge_rule
+          merge_rule_or_columns.join(", ")
+        end
+
+        def join_columns(columns)
+          columns.map { |column| "`#{column}`" }.join(", ")
+        end
+
+        def execute_query(query)
+          with_job_retry do
+            begin
+              job_id = "embulk_query_job_#{SecureRandom.uuid}"
+
+              Embulk.logger.info {
+                "embulk-output-bigquery: Query job starting... job_id:[#{job_id}]"
+              }
+
+              body = {
+                job_reference: {
+                  project_id: @project,
+                  job_id: job_id,
+                },
+                configuration: {
+                  query: {
+                    query: query,
+                    use_legacy_sql: false,
+                  }
+                }
+              }
+
+              if @location
+                body[:job_reference][:location] = @location
+              end
+
+              opts = {}
+              response = with_network_retry { client.insert_job(@project, body, **opts) }
+              wait_load('Query', response).to_h
+            rescue Google::Apis::ServerError, Google::Apis::ClientError, Google::Apis::AuthorizationError => e
+              response = {status_code: e.status_code, message: e.message, error_class: e.class}
+              Embulk.logger.error {
+                "embulk-output-bigquery: insert_job(#{@project}, #{body}, #{opts}), response:#{response}"
+              }
+              raise Error, "failed to query, response:#{response}"
+            end
+          end
+        end
       end
     end
   end
