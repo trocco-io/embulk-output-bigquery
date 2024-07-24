@@ -1,3 +1,17 @@
+## 0.7.2 - 2024-07-21
+* [maintenance] Fix GitHub Actions #166
+* [maintenance] Fix gcs_client in order to load data using gcs_bucket parameter (Thanks to kashira202111) #164
+* [maintenance] Prevent creating unnecessary tables. (Thanks to kashira202111) #148
+
+## 0.7.1 - 2024-03-4
+* [enhancement] Support description of columns and tables (Thanks to @kyoshidajp and @fagai ) #142
+* [maintenance] Add missing GitHub Actions environment setting. #160
+* [maintenance] Replace google-api-client with specific Google APIs (Thanks to @Nozomuts) #161
+* [maintenance] Update GitHub Actions use checkout@v4 and setup-java@v4 #162
+
+## 0.7.0 - 2024-02-1
+* [enhancement] Add support Embulk 0.11.x
+
 ## 0.6.9 - 2023-03-16
 * [enhancement] Add SSLException to retry job (thanks to @mzumi)
 

@@ -1,7 +1,5 @@
 # embulk-output-bigquery
 
-[![Build Status](https://secure.travis-ci.org/embulk/embulk-output-bigquery.png?branch=master)](http://travis-ci.org/embulk/embulk-output-bigquery)
-
 [Embulk](https://github.com/embulk/embulk/) output plugin to load/insert data into [Google BigQuery](https://cloud.google.com/bigquery/) using [direct insert](https://cloud.google.com/bigquery/loading-data-into-bigquery#loaddatapostrequest)
 
 ## Overview
@@ -13,6 +11,13 @@ https://developers.google.com/bigquery/loading-data-into-bigquery
 * **Resume supported**: no
 * **Cleanup supported**: no
 * **Dynamic table creating**: yes
+
+### Supported Embulk
+
+| gem version      | Embulk version     |
+|------------------|--------------------|
+| 0.7.0 and higher | v0.11.0 and higher |
+| 0.6.9 and lower  | v0.9.X and lower   |
 
 ### NOT IMPLEMENTED
 * insert data over streaming inserts
@@ -55,6 +60,7 @@ OAuth flow for installed applications.
 |  gcs_bucket                          | string      | optional   | nil                      | See [GCS Bucket](#gcs-bucket) |
 |  auto_create_gcs_bucket              | boolean     | optional   | false                    | See [GCS Bucket](#gcs-bucket) |
 |  progress_log_interval               | float       | optional   | nil (Disabled)           | Progress log interval. The progress log is disabled by nil (default). NOTE: This option may be removed in a future because a filter plugin can achieve the same goal |
+|  description                         | string      | optional   | nil                      | description of table |
 
 Client or request options
 
@@ -325,6 +331,7 @@ Column options are used to aid guessing BigQuery schema, or to define conversion
     - numeric:   `STRING`
   - **mode**: BigQuery mode such as `NULLABLE`, `REQUIRED`, and `REPEATED` (string, default: `NULLABLE`)
   - **fields**: Describes the nested schema fields if the type property is set to RECORD. Please note that this is **required** for `RECORD` column.
+  - **description**: description (string, default is `None`).
   - **timestamp_format**: timestamp format to convert into/from `timestamp` (string, default is `default_timestamp_format`)
   - **timezone**: timezone to convert into/from `timestamp`, `date` (string, default is `default_timezone`).
   - **description**: description for the column.

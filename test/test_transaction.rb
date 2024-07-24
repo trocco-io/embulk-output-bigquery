@@ -115,7 +115,7 @@ module Embulk
           task = Bigquery.configure(config, schema, processor_count)
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_TRUNCATE')
             mock(obj).delete_table(config['temp_table'])
@@ -129,7 +129,7 @@ module Embulk
           task = Bigquery.configure(config, schema, processor_count)
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_TRUNCATE')
             mock(obj).delete_table(config['temp_table'])
@@ -146,7 +146,7 @@ module Embulk
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
             mock(obj).get_dataset(config['dataset_old'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).create_table_if_not_exists(config['table_old'], dataset: config['dataset_old'])
 
@@ -167,7 +167,7 @@ module Embulk
             mock(obj).create_dataset(config['dataset'])
             mock(obj).create_dataset(config['dataset_old'], reference: config['dataset'])
             mock(obj).create_table_if_not_exists(config['table'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table_old'], dataset: config['dataset_old'])
 
             mock(obj).get_table_or_partition(config['table'])
@@ -186,7 +186,7 @@ module Embulk
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
             mock(obj).get_dataset(config['dataset_old'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).create_table_if_not_exists(config['table_old'], dataset: config['dataset_old'])
 
@@ -207,7 +207,7 @@ module Embulk
           task = Bigquery.configure(config, schema, processor_count)
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_APPEND')
             mock(obj).delete_table(config['temp_table'])
@@ -221,7 +221,7 @@ module Embulk
           task = Bigquery.configure(config, schema, processor_count)
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
-            mock(obj).create_table_if_not_exists(config['temp_table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_APPEND')
             mock(obj).delete_table(config['temp_table'])
