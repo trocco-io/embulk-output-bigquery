@@ -34,6 +34,7 @@ jobs:
     #
     - name: Publish
       run: |
+        if [ -z "${GEM_HOST_API_KEY}" ]; then exit 0; fi
         rake build
         gem push pkg/${EMBULK_PLUGIN_NAME}-${{ steps.vars.outputs.version }}.gem
       env:
