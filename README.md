@@ -61,6 +61,8 @@ OAuth flow for installed applications.
 |  auto_create_gcs_bucket              | boolean     | optional   | false                    | See [GCS Bucket](#gcs-bucket) |
 |  progress_log_interval               | float       | optional   | nil (Disabled)           | Progress log interval. The progress log is disabled by nil (default). NOTE: This option may be removed in a future because a filter plugin can achieve the same goal |
 |  description                         | string      | optional   | nil                      | description of table |
+|  merge_keys                          | array       | optional   |                          | key column names for merging records in merge mode (string array, required in merge mode if table doesn't have primary key) |
+|  merge_rule                          | array       | optional   |                          | list of column assignments for updating existing records used in merge mode, for example foo = T.foo + S.foo (T means target table and S means source table). (string array, default: always overwrites with new values) |
 
 Client or request options
 
@@ -173,6 +175,11 @@ NOTE: BigQuery does not support replacing (actually, copying into) a non-partiti
 
 1. Delete destination table (or partition), if it exists.
 2. Load to destination table (or partition).
+
+##### merge
+
+1. Load to temporary table (Create and WRITE_APPEND in parallel)
+2. Merge temporary table to destination table (or partition). (Use query job instead of copy job)
 
 ### Authentication
 

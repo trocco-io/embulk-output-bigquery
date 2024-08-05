@@ -100,6 +100,9 @@ module Embulk
 
         config = least_config.merge('mode' => 'replace_backup')
         assert_raise { Bigquery.configure(config, schema, processor_count) }
+
+        config = least_config.merge('mode' => 'merge')
+        assert_nothing_raised { Bigquery.configure(config, schema, processor_count) }
       end
 
       def test_location

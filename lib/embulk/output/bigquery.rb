@@ -91,6 +91,8 @@ module Embulk
           'time_partitioning'              => config.param('time_partitioning',              :hash,    :default => nil),
           'clustering'                     => config.param('clustering',                     :hash,    :default => nil), # google-api-ruby-client >= v0.21.0
           'schema_update_options'          => config.param('schema_update_options',          :array,   :default => nil),
+          'merge_keys'                     => config.param('merge_keys',                     :array,   :default => []),
+          'merge_rule'                     => config.param('merge_rule',                     :array,   :default => []),
 
           'temporary_table_expiration'     => config.param('temporary_table_expiration',     :integer, :default => nil),
 
@@ -103,11 +105,11 @@ module Embulk
         now = Time.now
 
         task['mode'] = task['mode'].downcase
-        unless %w[append append_direct replace delete_in_advance replace_backup].include?(task['mode'])
-          raise ConfigError.new "`mode` must be one of append, append_direct, replace, delete_in_advance, replace_backup"
+        unless %w[append append_direct replace delete_in_advance replace_backup merge].include?(task['mode'])
+          raise ConfigError.new "`mode` must be one of append, append_direct, replace, delete_in_advance, replace_backup, merge"
         end
 
-        if %w[append replace delete_in_advance replace_backup].include?(task['mode']) and !task['auto_create_table']
+        if %w[append replace delete_in_advance replace_backup merge].include?(task['mode']) and !task['auto_create_table']
           raise ConfigError.new "`mode: #{task['mode']}` requires `auto_create_table: true`"
         end
 
@@ -209,7 +211,7 @@ module Embulk
 
         unique_name = SecureRandom.uuid.gsub('-', '_')
 
-        if %w[replace replace_backup append].include?(task['mode'])
+        if %w[replace replace_backup append merge].include?(task['mode'])
           task['temp_table'] ||= "LOAD_TEMP_#{unique_name}_#{task['table']}"
         else
           task['temp_table'] = nil
@@ -317,6 +319,9 @@ module Embulk
         when 'append'
           bigquery.create_table_if_not_exists(task['temp_table'], options: temp_options)
           bigquery.create_table_if_not_exists(task['table']) # needs for when task['table'] is a partition
+        when 'merge'
+          bigquery.create_table_if_not_exists(task['temp_table'], options: temp_options)
+          bigquery.create_table_if_not_exists(task['table']) # needs for when task['table'] is a partition
         when 'replace_backup'
           bigquery.create_table_if_not_exists(task['temp_table'], options: temp_options)
           bigquery.create_table_if_not_exists(task['table'])
@@ -401,7 +406,10 @@ module Embulk
             end
 
             if task['temp_table']
-              if task['mode'] == 'append'
+              case task['mode']
+              when 'merge'
+                bigquery.merge(task['temp_table'], task['table'], task['merge_keys'], task['merge_rule'])
+              when 'append'
                 bigquery.copy(task['temp_table'], task['table'], write_disposition: 'WRITE_APPEND')
               else # replace or replace_backup
                 bigquery.copy(task['temp_table'], task['table'], write_disposition: 'WRITE_TRUNCATE')
@@ -413,7 +421,7 @@ module Embulk
 
         ensure
           begin
-            if task['temp_table'] # append or replace or replace_backup
+            if task['temp_table'] # append or replace or replace_backup or merge
               bigquery.delete_table(task['temp_table'])
             end
           ensure
