@@ -30,6 +30,16 @@ module Embulk
           @task['encoding'] ||= 'UTF-8'
           @task['ignore_unknown_values'] = false if @task['ignore_unknown_values'].nil?
           @task['allow_quoted_newlines'] = false if @task['allow_quoted_newlines'].nil?
+
+          if @task['mode'] == 'replace'
+            begin
+              @src_table_schema = get_table(@task['table']).schema.fields
+            rescue NotFoundError
+              @src_table_schema = []
+            end
+          else
+            @src_table_schema = []
+          end
         end
 
         def fields
@@ -524,13 +534,22 @@ module Embulk
           with_job_retry do
             table = get_table(@task['table'])
 
-            def patch_description(fields, column_options)
+            def patch_description(fields, column_options, src_fields)
               fields.map do |field|
+                src_field = src_fields.select { |s_field| s_field.name == field.name }.first
+                if src_field
+                  field.update!(description: src_field.description) if src_field.description
+                  if field.fields && src_field.fields
+                    nested_fields = patch_description(field.fields, [], src_field.fields)
+                    field.update!(fields: nested_fields)
+                  end
+                end
+
                 column_option = column_options.select{|col_opt| col_opt['name'] == field.name}.first
                 if column_option
                   field.update!(description: column_option['description']) if column_option['description']
                   if field.fields && column_option['fields']
-                    nested_fields = patch_description(field.fields, column_option['fields'])
+                    nested_fields = patch_description(field.fields, column_option['fields'], [])
                     field.update!(fields: nested_fields)
                   end
                 end
@@ -538,7 +557,7 @@ module Embulk
               end
             end
 
-            fields = patch_description(table.schema.fields, @task['column_options'])
+            fields = patch_description(table.schema.fields, @task['column_options'], @src_table_schema)
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
             with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
