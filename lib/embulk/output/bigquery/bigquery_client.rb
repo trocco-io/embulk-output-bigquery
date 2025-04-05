@@ -33,12 +33,12 @@ module Embulk
 
           if @task['mode'] == 'replace'
             begin
-              @src_table_schema = get_table(@task['table']).schema.fields
+              @src_table = get_table(@task['table'])
             rescue NotFoundError
-              @src_table_schema = []
+              @src_table = nil
             end
           else
-            @src_table_schema = []
+            @src_table = nil
           end
         end
 
@@ -430,7 +430,7 @@ module Embulk
               table_reference: {
                 table_id: table,
               },
-              description: @task['description'],
+              description: @task['description'] || @src_table&.description,
               schema: {
                 fields: fields,
               }
@@ -536,7 +536,7 @@ module Embulk
 
             def patch_description(fields, column_options, src_fields)
               fields.map do |field|
-                src_field = src_fields.select { |s_field| s_field.name == field.name }.first
+                src_field = src_fields&.select {|s_field| s_field.name == field.name}&.first
                 if src_field
                   field.update!(description: src_field.description) if src_field.description
                   if field.fields && src_field.fields
@@ -557,7 +557,7 @@ module Embulk
               end
             end
 
-            fields = patch_description(table.schema.fields, @task['column_options'], @src_table_schema)
+            fields = patch_description(table.schema.fields, @task['column_options'], @src_table&.schema&.fields)
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
             with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
