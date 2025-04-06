@@ -536,7 +536,7 @@ module Embulk
 
             def patch_description(fields, column_options, src_fields)
               fields.map do |field|
-                src_field = src_fields&.select {|s_field| s_field.name == field.name}&.first
+                src_field = src_fields.select {|s_field| s_field.name == field.name}.first
                 if src_field
                   field.update!(description: src_field.description) if src_field.description
                   if field.fields && src_field.fields
@@ -557,7 +557,7 @@ module Embulk
               end
             end
 
-            fields = patch_description(table.schema.fields, @task['column_options'], @src_table&.schema&.fields)
+            fields = patch_description(table.schema.fields, @task['column_options'], @src_table ? @src_table.schema.fields : [])
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
             with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
