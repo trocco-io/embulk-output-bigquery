@@ -31,7 +31,7 @@ module Embulk
           @task['ignore_unknown_values'] = false if @task['ignore_unknown_values'].nil?
           @task['allow_quoted_newlines'] = false if @task['allow_quoted_newlines'].nil?
 
-          if @task['mode'] == 'replace'
+          if @task['mode'] == 'replace' && @task['retain_column_descriptions']
             begin
               @src_table = get_table(@task['table'])
             rescue NotFoundError
