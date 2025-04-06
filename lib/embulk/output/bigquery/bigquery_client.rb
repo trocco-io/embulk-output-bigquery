@@ -430,7 +430,7 @@ module Embulk
               table_reference: {
                 table_id: table,
               },
-              description: @task['description'] || @src_table&.description,
+              description: @task['description'],
               schema: {
                 fields: fields,
               }
