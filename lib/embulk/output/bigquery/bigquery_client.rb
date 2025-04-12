@@ -13,7 +13,8 @@ module Embulk
 
         def initialize(task, schema, fields = nil)
           scope = "https://www.googleapis.com/auth/bigquery"
-          client_class = BigqueryServiceWithPolicyTag
+          need_takeover = (task['mode'] == 'replace') && (task['retain_column_descriptions'] || task['retain_column_policy_tags'])
+          client_class = need_takeover ? BigqueryServiceWithPolicyTag : Google::Apis::BigqueryV2::BigqueryService
           super(task, scope, client_class)
 
           @schema = schema
@@ -35,12 +36,8 @@ module Embulk
           @src_fields = need_takeover ? fetch_src_fields : []
         end
 
-        def need_takeover
-          (@task['mode'] == 'replace') && (@task['retain_column_descriptions'] || @task['retain_column_policy_tags'])
-        end
-
         def fetch_src_fields
-          get_table_with_policy_tags(@task['table'])&.schema&.fields || []
+          get_table(@task['table'])&.schema&.fields || []
         rescue NotFoundError
           []
         end
@@ -532,29 +529,10 @@ module Embulk
           end
         end
 
-        def get_table_with_policy_tags(table, dataset: nil)
-          begin
-            table = Helper.chomp_partition_decorator(table)
-            dataset ||= @dataset
-            Embulk.logger.info { "embulk-output-bigquery: Get table With PolicyTags... #{@destination_project}:#{dataset}.#{table}" }
-            with_network_retry { client.get_table_with_policy_tags(@destination_project, dataset, table) }
-          rescue Google::Apis::ServerError, Google::Apis::ClientError, Google::Apis::AuthorizationError => e
-            if e.status_code == 404
-              raise NotFoundError, "Table #{@destination_project}:#{dataset}.#{table} is not found"
-            end
-
-            response = {status_code: e.status_code, message: e.message, error_class: e.class}
-            Embulk.logger.error {
-              "embulk-output-bigquery: get_table(#{@destination_project}, #{dataset}, #{table}), response:#{response}"
-            }
-            raise Error, "failed to get table #{@destination_project}:#{dataset}.#{table}, response:#{response}"
-          end
-        end
-
         # update only column.description
         def patch_table
           with_job_retry do
-            table = need_takeover ? get_table_with_policy_tags(@task['table']) : get_table(@task['table'])
+            table = get_table(@task['table'])
 
             def patch_description_and_policy_tags(fields, column_options, src_fields)
               fields.map do |field|
@@ -583,13 +561,7 @@ module Embulk
             fields = patch_description_and_policy_tags(table.schema.fields, @task['column_options'], @src_fields)
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
-            with_network_retry do
-              if need_takeover
-                client.patch_table_with_policy_tags(@project, @dataset, table_id, table)
-              else
-                client.patch_table(@project, @dataset, table_id, table)
-              end
-            end
+            with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
           end
         end
 

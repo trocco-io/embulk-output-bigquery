@@ -7,7 +7,7 @@ module Embulk
       # Due to the JRuby version constraint in Embulk v0.9, it’s not possible to upgrade to a version of the google-api-client (0.37.0 or later) that includes support for policy_tags.
       # So the workaround was implemented using a patch-like solution as shown below.
       class BigqueryServiceWithPolicyTag < Google::Apis::BigqueryV2::BigqueryService
-        def get_table_with_policy_tags(project_id, dataset_id, table_id, selected_fields: nil, fields: nil, quota_user: nil, user_ip: nil, options: nil, &block)
+        def get_table(project_id, dataset_id, table_id, selected_fields: nil, fields: nil, quota_user: nil, user_ip: nil, options: nil, &block)
           command = make_simple_command(:get, 'projects/{projectId}/datasets/{datasetId}/tables/{tableId}', options)
           command.response_representation = TableWithPolicyTag::Representation
           command.response_class = TableWithPolicyTag
@@ -21,7 +21,7 @@ module Embulk
           execute_or_queue_command(command, &block)
         end
 
-        def patch_table_with_policy_tags(project_id, dataset_id, table_id, table_object = nil, autodetect_schema: nil, fields: nil, quota_user: nil, options: nil, &block)
+        def patch_table(project_id, dataset_id, table_id, table_object = nil, autodetect_schema: nil, fields: nil, quota_user: nil, options: nil, &block)
           command = make_simple_command(:patch, 'projects/{+projectId}/datasets/{+datasetId}/tables/{+tableId}', options)
           command.request_representation = TableWithPolicyTag::Representation
           command.request_object = table_object
