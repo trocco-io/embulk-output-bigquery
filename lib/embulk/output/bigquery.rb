@@ -65,6 +65,7 @@ module Embulk
 
           'description'                    => config.param('description',                    :string,  :default => nil),
           'retain_column_descriptions'     => config.param('retain_column_descriptions',     :bool,    :default => false),
+          'retain_column_policy_tags'      => config.param('retain_column_policy_tags',      :bool,    :default => false),
 
           'open_timeout_sec'               => config.param('open_timeout_sec',               :integer, :default => nil),
           'timeout_sec'                    => config.param('timeout_sec',                    :integer, :default => nil), # google-api-ruby-client < v0.11.0

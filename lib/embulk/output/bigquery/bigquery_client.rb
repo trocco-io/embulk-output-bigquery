@@ -3,6 +3,7 @@ require 'json'
 require 'thwait'
 require_relative 'google_client'
 require_relative 'helper'
+require_relative 'bigquery_service_with_policy_tag'
 
 module Embulk
   module Output
@@ -12,7 +13,7 @@ module Embulk
 
         def initialize(task, schema, fields = nil)
           scope = "https://www.googleapis.com/auth/bigquery"
-          client_class = Google::Apis::BigqueryV2::BigqueryService
+          client_class = BigqueryServiceWithPolicyTag
           super(task, scope, client_class)
 
           @schema = schema
@@ -31,15 +32,17 @@ module Embulk
           @task['ignore_unknown_values'] = false if @task['ignore_unknown_values'].nil?
           @task['allow_quoted_newlines'] = false if @task['allow_quoted_newlines'].nil?
 
-          if @task['mode'] == 'replace' && @task['retain_column_descriptions']
-            begin
-              @src_table = get_table(@task['table'])
-            rescue NotFoundError
-              @src_table = nil
-            end
-          else
-            @src_table = nil
-          end
+          @src_fields = need_takeover ? fetch_src_fields : []
+        end
+
+        def need_takeover
+          (@task['mode'] == 'replace') && (@task['retain_column_descriptions'] || @task['retain_column_policy_tags'])
+        end
+
+        def fetch_src_fields
+          get_table_with_policy_tags(@task['table'])&.schema&.fields || []
+        rescue NotFoundError
+          []
         end
 
         def fields
@@ -529,18 +532,38 @@ module Embulk
           end
         end
 
+        def get_table_with_policy_tags(table, dataset: nil)
+          begin
+            table = Helper.chomp_partition_decorator(table)
+            dataset ||= @dataset
+            Embulk.logger.info { "embulk-output-bigquery: Get table With PolicyTags... #{@destination_project}:#{dataset}.#{table}" }
+            with_network_retry { client.get_table_with_policy_tags(@destination_project, dataset, table) }
+          rescue Google::Apis::ServerError, Google::Apis::ClientError, Google::Apis::AuthorizationError => e
+            if e.status_code == 404
+              raise NotFoundError, "Table #{@destination_project}:#{dataset}.#{table} is not found"
+            end
+
+            response = {status_code: e.status_code, message: e.message, error_class: e.class}
+            Embulk.logger.error {
+              "embulk-output-bigquery: get_table(#{@destination_project}, #{dataset}, #{table}), response:#{response}"
+            }
+            raise Error, "failed to get table #{@destination_project}:#{dataset}.#{table}, response:#{response}"
+          end
+        end
+
         # update only column.description
         def patch_table
           with_job_retry do
-            table = get_table(@task['table'])
+            table = need_takeover ? get_table_with_policy_tags(@task['table']) : get_table(@task['table'])
 
-            def patch_description(fields, column_options, src_fields)
+            def patch_description_and_policy_tags(fields, column_options, src_fields)
               fields.map do |field|
                 src_field = src_fields.select {|s_field| s_field.name == field.name}.first
                 if src_field
-                  field.update!(description: src_field.description) if src_field.description
+                  field.update!(description: src_field.description) if @task['retain_column_descriptions'] && src_field.description
+                  field.update!(policy_tags: src_field.policy_tags) if @task['retain_column_policy_tags'] && src_field.policy_tags
                   if field.fields && src_field.fields
-                    nested_fields = patch_description(field.fields, [], src_field.fields)
+                    nested_fields = patch_description_and_policy_tags(field.fields, [], src_field.fields)
                     field.update!(fields: nested_fields)
                   end
                 end
@@ -549,7 +572,7 @@ module Embulk
                 if column_option
                   field.update!(description: column_option['description']) if column_option['description']
                   if field.fields && column_option['fields']
-                    nested_fields = patch_description(field.fields, column_option['fields'], [])
+                    nested_fields = patch_description_and_policy_tags(field.fields, column_option['fields'], [])
                     field.update!(fields: nested_fields)
                   end
                 end
@@ -557,10 +580,16 @@ module Embulk
               end
             end
 
-            fields = patch_description(table.schema.fields, @task['column_options'], @src_table ? @src_table.schema.fields : [])
+            fields = patch_description_and_policy_tags(table.schema.fields, @task['column_options'], @src_fields)
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
-            with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
+            with_network_retry do
+              if need_takeover
+                client.patch_table_with_policy_tags(@project, @dataset, table_id, table)
+              else
+                client.patch_table(@project, @dataset, table_id, table)
+              end
+            end
           end
         end
 

@@ -143,7 +143,22 @@ module Embulk
           task = Bigquery.configure(config, schema, processor_count)
           any_instance_of(BigqueryClient) do |obj|
             mock(obj).get_dataset(config['dataset'])
-            mock(obj).get_table(config['table'])
+            mock(obj).get_table_with_policy_tags(config['table'])
+            mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
+            mock(obj).create_table_if_not_exists(config['table'])
+            mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_TRUNCATE')
+            mock(obj).delete_table(config['temp_table'])
+            mock(obj).patch_table
+          end
+          Bigquery.transaction(config, schema, processor_count, &control)
+        end
+
+        def test_replace_with_retain_column_policy_tags
+          config = least_config.merge('mode' => 'replace', 'retain_column_policy_tags' => true)
+          task = Bigquery.configure(config, schema, processor_count)
+          any_instance_of(BigqueryClient) do |obj|
+            mock(obj).get_dataset(config['dataset'])
+            mock(obj).get_table_with_policy_tags(config['table'])
             mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_TRUNCATE')
