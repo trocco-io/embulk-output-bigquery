@@ -63,6 +63,8 @@ OAuth flow for installed applications.
 |  description                         | string      | optional   | nil                      | description of table |
 |  merge_keys                          | array       | optional   |                          | key column names for merging records in merge mode (string array, required in merge mode if table doesn't have primary key) |
 |  merge_rule                          | array       | optional   |                          | list of column assignments for updating existing records used in merge mode, for example foo = T.foo + S.foo (T means target table and S means source table). (string array, default: always overwrites with new values) |
+|  retain_column_descriptions          | boolean     | optional   | false                    | In case of replace mode, the column's descriptions are taken over. |
+|  retain_column_policy_tags           | boolean     | optional   | false                    | In case of replace mode, the table policy tags are taken over. |
 
 Client or request options
 
