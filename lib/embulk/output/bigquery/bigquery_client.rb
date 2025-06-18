@@ -364,7 +364,7 @@ module Embulk
             end
             body = {
               dataset_reference: {
-                project_id: @project,
+                project_id: @destination_project,
                 dataset_id: dataset,
               },
             }.merge(hint)
@@ -372,8 +372,8 @@ module Embulk
               body[:location] = @location
             end
             opts = {}
-            Embulk.logger.debug { "embulk-output-bigquery: insert_dataset(#{@project}, #{dataset}, #{@location_for_log}, #{body}, #{opts})" }
-            with_network_retry { client.insert_dataset(@project, body, **opts) }
+            Embulk.logger.debug { "embulk-output-bigquery: insert_dataset(#{@destination_project}, #{dataset}, #{@location_for_log}, #{body}, #{opts})" }
+            with_network_retry { client.insert_dataset(@destination_project, body, **opts) }
           rescue Google::Apis::ServerError, Google::Apis::ClientError, Google::Apis::AuthorizationError => e
             if e.status_code == 409 && /Already Exists:/ =~ e.message
               # ignore 'Already Exists' error
@@ -382,7 +382,7 @@ module Embulk
 
             response = {status_code: e.status_code, message: e.message, error_class: e.class}
             Embulk.logger.error {
-              "embulk-output-bigquery: insert_dataset(#{@project}, #{body}, #{opts}), response:#{response}"
+              "embulk-output-bigquery: insert_dataset(#{@destination_project}, #{body}, #{opts}), response:#{response}"
             }
             raise Error, "failed to create dataset #{@destination_project}:#{dataset} in #{@location_for_log}, response:#{response}"
           end
@@ -554,15 +554,15 @@ module Embulk
             fields = patch_description(table.schema.fields, @task['column_options'])
             table.schema.update!(fields: fields)
             table_id = Helper.chomp_partition_decorator(@task['table'])
-            with_network_retry { client.patch_table(@project, @dataset, table_id, table) }
+            with_network_retry { client.patch_table(@destination_project, @dataset, table_id, table) }
           end
         end
 
         def merge(source_table, target_table, merge_keys, merge_rule)
           columns = @schema.map { |column| column[:name] }
           query = <<~EOD
-            MERGE `#{@dataset}`.`#{target_table}` T
-            USING `#{@dataset}`.`#{source_table}` S
+            MERGE `#{@destination_project}`.`#{@dataset}`.`#{target_table}` T
+            USING `#{@destination_project}`.`#{@dataset}`.`#{source_table}` S
                ON #{join_merge_keys(merge_keys.empty? ? merge_keys(target_table) : merge_keys)}
              WHEN MATCHED THEN
                UPDATE SET #{join_merge_rule_or_columns(merge_rule, columns)}
@@ -579,9 +579,9 @@ module Embulk
             SELECT
               KCU.COLUMN_NAME
             FROM
-              `#{@dataset}`.INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+              `#{@destination_project}`.`#{@dataset}`.INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
             JOIN
-              `#{@dataset}`.INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
+              `#{@destination_project}`.`#{@dataset}`.INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
             ON
               KCU.CONSTRAINT_CATALOG = TC.CONSTRAINT_CATALOG AND
               KCU.CONSTRAINT_SCHEMA = TC.CONSTRAINT_SCHEMA AND
