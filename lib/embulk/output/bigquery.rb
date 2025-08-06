@@ -244,7 +244,7 @@ module Embulk
           if task['range_partitioning']
             raise ConfigError.new "Partition decorators(`#{task['table']}`) don't support `range_partition`"
           end
-          task['time_partitioning'] = {'type' => 'DAY'}
+          task['time_partitioning'] ||= {'type' => 'DAY'}
         end
 
         if task['range_partitioning']
