@@ -37,6 +37,7 @@ OAuth flow for installed applications.
 |  mode                                | string      | optional   | "append"                 | See [Mode](#mode)      |
 |  auth_method                         | string      | optional   | "application\_default"   | See [Authentication](#authentication) |
 |  json_keyfile                        | string      | optional   |                          | keyfile path or `content` |
+|  access_token                        | string      | optional   |                          | access token for authentication |
 |  project                             | string      | required unless service\_account's `json_keyfile` is given. | | project\_id |
 |  destination_project                 | string      | optional   | `project` value         |  A destination project to which the data will be loaded. Use this if you want to separate a billing project (the `project` value) and a destination project (the `destination_project` value). |
 |  dataset                             | string      | required   |                          | dataset |
@@ -191,12 +192,13 @@ NOTE: BigQuery does not support replacing (actually, copying into) a non-partiti
 
 ### Authentication
 
-There are four authentication methods
+There are five authentication methods
 
 1. `service_account` (or `json_key` for backward compatibility)
 1. `authorized_user`
 1. `compute_engine`
 1. `application_default`
+1. `access_token`
 
 #### service\_account (or json\_key)
 
@@ -280,6 +282,17 @@ See https://cloud.google.com/docs/authentication/production for details.
 out:
   type: bigquery
   auth_method: application_default
+```
+
+#### access\_token
+
+Use OAuth2 access token directly. This is useful when you have a pre-obtained access token from an external authentication flow.
+
+```yaml
+out:
+  type: bigquery
+  auth_method: access_token
+  access_token: "ya29.a0AfH6SMBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### Table id formatting

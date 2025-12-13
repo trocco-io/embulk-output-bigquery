@@ -5,11 +5,12 @@ module Embulk
     class Bigquery < OutputPlugin
       class Auth
 
-        attr_reader :auth_method, :json_key, :scope
+        attr_reader :auth_method, :json_key, :access_token, :scope
 
         def initialize(task, scope)
           @auth_method = task['auth_method']
           @json_key = task['json_keyfile']
+          @access_token = task['access_token']
           @scope = scope
         end
 
@@ -25,6 +26,8 @@ module Embulk
             return Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: key, scope: scope)
           when 'application_default'
             return Google::Auth.get_application_default([scope])
+          when 'access_token'
+            return Signet::OAuth2::Client.new(access_token: access_token)
           else
             raise ConfigError.new("Unknown auth method: #{auth_method}")
           end
