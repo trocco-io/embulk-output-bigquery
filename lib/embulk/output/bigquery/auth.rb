@@ -9,12 +9,11 @@ module Embulk
     class Bigquery < OutputPlugin
       class Auth
 
-        attr_reader :auth_method, :json_key, :access_token, :workload_identity_federation, :scope
+        attr_reader :auth_method, :json_key, :workload_identity_federation, :scope
 
         def initialize(task, scope)
           @auth_method = task['auth_method']
           @json_key = task['json_keyfile']
-          @access_token = task['access_token']
           @workload_identity_federation = task['workload_identity_federation']
           @scope = scope
         end
@@ -31,8 +30,6 @@ module Embulk
             return Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: key, scope: scope)
           when 'application_default'
             return Google::Auth.get_application_default([scope])
-          when 'access_token'
-            return Signet::OAuth2::Client.new(access_token: access_token)
           when 'workload_identity_federation'
             return WorkloadIdentityFederationAuth.new(workload_identity_federation).authenticate
           else
