@@ -36,6 +36,7 @@ module Embulk
           'auth_method'                    => config.param('auth_method',                    :string,  :default => 'application_default'),
           'json_keyfile'                   => config.param('json_keyfile',                  LocalFile, :default => nil),
           'access_token'                   => config.param('access_token',                   :string,  :default => nil),
+          'workload_identity_federation'   => config.param('workload_identity_federation',   :hash,    :default => nil),
           'project'                        => config.param('project',                        :string,  :default => nil),
           'destination_project'            => config.param('destination_project',            :string,  :default => nil),
           'dataset'                        => config.param('dataset',                        :string),
@@ -134,14 +135,31 @@ module Embulk
         end
 
         task['auth_method'] = task['auth_method'].downcase
-        unless %w[json_key service_account authorized_user compute_engine application_default access_token].include?(task['auth_method'])
-          raise ConfigError.new "`auth_method` must be one of service_account (or json_key), authorized_user, compute_engine, application_default, access_token"
+        unless %w[json_key service_account authorized_user compute_engine application_default access_token workload_identity_federation].include?(task['auth_method'])
+          raise ConfigError.new "`auth_method` must be one of service_account (or json_key), authorized_user, compute_engine, application_default, access_token, workload_identity_federation"
         end
         if (task['auth_method'] == 'service_account' or task['auth_method'] == 'json_key') and task['json_keyfile'].nil?
           raise ConfigError.new "`json_keyfile` is required for auth_method: service_account (or json_key)"
         end
         if task['auth_method'] == 'access_token' and task['access_token'].nil?
           raise ConfigError.new "`access_token` is required for auth_method: access_token"
+        end
+        if task['auth_method'] == 'workload_identity_federation'
+          if task['workload_identity_federation'].nil?
+            raise ConfigError.new "`workload_identity_federation` config is required for auth_method: workload_identity_federation"
+          end
+          wif = task['workload_identity_federation']
+          if wif['json_keyfile'].nil?
+            raise ConfigError.new "`workload_identity_federation.json_keyfile` is required"
+          end
+          if wif['aws_access_key_id'].nil?
+            raise ConfigError.new "`workload_identity_federation.aws_access_key_id` is required"
+          end
+          if wif['aws_secret_access_key'].nil?
+            raise ConfigError.new "`workload_identity_federation.aws_secret_access_key` is required"
+          end
+          wif['aws_region'] ||= 'ap-northeast-1'
+          wif['json_keyfile'] = LocalFile.load(wif['json_keyfile'])
         end
 
         if task['json_keyfile']
