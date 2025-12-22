@@ -12,6 +12,7 @@ module Embulk
         def initialize(config)
           @aws_access_key_id = config['aws_access_key_id']
           @aws_secret_access_key = config['aws_secret_access_key']
+          @aws_session_token = config['aws_session_token']
           @aws_region = config['aws_region'] || 'ap-northeast-1'
 
           wif_config = JSON.parse(config['config'])
@@ -61,6 +62,7 @@ module Embulk
             'x-amz-date' => amz_date,
             'x-goog-cloud-target-resource' => @audience
           }
+          headers['x-amz-security-token'] = @aws_session_token if @aws_session_token
 
           signed_headers_list = headers.keys.sort
           signed_headers = signed_headers_list.join(';')
@@ -118,7 +120,7 @@ module Embulk
             'scope' => 'https://www.googleapis.com/auth/cloud-platform',
             'requested_token_type' => 'urn:ietf:params:oauth:token-type:access_token',
             'subject_token_type' => 'urn:ietf:params:aws:token-type:aws4_request',
-            'subject_token' => JSON.generate(aws_request)
+            'subject_token' => URI.encode_www_form_component(JSON.generate(aws_request))
           })
 
           uri = URI.parse(@token_url)
