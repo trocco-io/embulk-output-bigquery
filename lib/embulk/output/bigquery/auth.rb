@@ -46,10 +46,10 @@ module Embulk
           @aws_secret_access_key = config['aws_secret_access_key']
           @aws_region = config['aws_region'] || 'ap-northeast-1'
 
-          json_config = JSON.parse(config['json_keyfile'])
-          @audience = json_config['audience']
-          @service_account_impersonation_url = json_config['service_account_impersonation_url']
-          @token_url = json_config['token_url'] || 'https://sts.googleapis.com/v1/token'
+          wif_config = JSON.parse(config['config'])
+          @audience = wif_config['audience']
+          @service_account_impersonation_url = wif_config['service_account_impersonation_url']
+          @token_url = wif_config['token_url'] || 'https://sts.googleapis.com/v1/token'
         end
 
         def authenticate

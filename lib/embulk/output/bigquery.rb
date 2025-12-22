@@ -145,8 +145,8 @@ module Embulk
             raise ConfigError.new "`workload_identity_federation` config is required for auth_method: workload_identity_federation"
           end
           wif = task['workload_identity_federation']
-          if wif['json_keyfile'].nil?
-            raise ConfigError.new "`workload_identity_federation.json_keyfile` is required"
+          if wif['config'].nil?
+            raise ConfigError.new "`workload_identity_federation.config` is required"
           end
           if wif['aws_access_key_id'].nil?
             raise ConfigError.new "`workload_identity_federation.aws_access_key_id` is required"
@@ -155,7 +155,7 @@ module Embulk
             raise ConfigError.new "`workload_identity_federation.aws_secret_access_key` is required"
           end
           wif['aws_region'] ||= 'ap-northeast-1'
-          wif['json_keyfile'] = LocalFile.load(wif['json_keyfile'])
+          wif['config'] = LocalFile.load(wif['config'])
         end
 
         if task['json_keyfile']
