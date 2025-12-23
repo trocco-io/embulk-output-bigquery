@@ -28,7 +28,7 @@ module Embulk
           when 'application_default'
             return Google::Auth.get_application_default([scope])
           when 'workload_identity_federation'
-            return WorkloadIdentityFederationAuth.new(workload_identity_federation).authenticate
+            return WorkloadIdentityFederationAuth.new(workload_identity_federation, [scope]).authenticate
           else
             raise ConfigError.new("Unknown auth method: #{auth_method}")
           end

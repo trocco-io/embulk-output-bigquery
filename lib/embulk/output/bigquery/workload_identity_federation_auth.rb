@@ -9,11 +9,12 @@ module Embulk
       class WorkloadIdentityFederationAuth
         TOKEN_LIFETIME_SECONDS = 3600
 
-        def initialize(config)
+        def initialize(config, scopes)
           @aws_access_key_id = config['aws_access_key_id']
           @aws_secret_access_key = config['aws_secret_access_key']
           @aws_session_token = config['aws_session_token']
           @aws_region = config['aws_region'] || 'ap-northeast-1'
+          @scopes = scopes
 
           wif_config = JSON.parse(config['config'])
           @audience = wif_config['audience']
@@ -113,6 +114,7 @@ module Embulk
           hmac_sha256(k_service, 'aws4_request')
         end
 
+        # https://docs.cloud.google.com/iam/docs/reference/sts/rest/v1/TopLevel/token
         def exchange_token_for_google_access_token(aws_request)
           data = URI.encode_www_form({
             'grant_type' => 'urn:ietf:params:oauth:grant-type:token-exchange',
@@ -153,6 +155,7 @@ module Embulk
           response_json['access_token']
         end
 
+        # https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/generateAccessToken
         def impersonate_service_account(federated_token)
           sa_email = service_account_email
           impersonation_url = "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/#{sa_email}:generateAccessToken"
@@ -165,7 +168,7 @@ module Embulk
           http.use_ssl = true
 
           request_body = {
-            'scope' => ['https://www.googleapis.com/auth/bigquery'],
+            'scope' => @scopes,
             'lifetime' => "#{TOKEN_LIFETIME_SECONDS}s"
           }
 
