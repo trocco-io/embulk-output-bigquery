@@ -37,6 +37,7 @@ OAuth flow for installed applications.
 |  mode                                | string      | optional   | "append"                 | See [Mode](#mode)      |
 |  auth_method                         | string      | optional   | "application\_default"   | See [Authentication](#authentication) |
 |  json_keyfile                        | string      | optional   |                          | keyfile path or `content` |
+|  workload_identity_federation        | hash        | optional   |                          | Workload Identity Federation config. See [Workload Identity Federation](#workload-identity-federation) |
 |  project                             | string      | required unless service\_account's `json_keyfile` is given. | | project\_id |
 |  destination_project                 | string      | optional   | `project` value         |  A destination project to which the data will be loaded. Use this if you want to separate a billing project (the `project` value) and a destination project (the `destination_project` value). |
 |  dataset                             | string      | required   |                          | dataset |
@@ -191,12 +192,13 @@ NOTE: BigQuery does not support replacing (actually, copying into) a non-partiti
 
 ### Authentication
 
-There are four authentication methods
+There are five authentication methods
 
 1. `service_account` (or `json_key` for backward compatibility)
 1. `authorized_user`
 1. `compute_engine`
 1. `application_default`
+1. `workload_identity_federation`
 
 #### service\_account (or json\_key)
 
@@ -280,6 +282,41 @@ See https://cloud.google.com/docs/authentication/production for details.
 out:
   type: bigquery
   auth_method: application_default
+```
+
+#### workload\_identity\_federation
+
+Use Workload Identity Federation to authenticate using AWS credentials to access Google Cloud resources.
+This allows users to authenticate without storing Google Cloud service account keys by leveraging AWS IAM credentials.
+
+| name                                 | type        | required?  | default           | description            |
+|:-------------------------------------|:------------|:-----------|:------------------|:-----------------------|
+| workload_identity_federation.config | string | required   |                   | Path to the Workload Identity Federation JSON config file or `content` |
+| workload_identity_federation.aws_access_key_id | string | required |                | AWS Access Key ID |
+| workload_identity_federation.aws_secret_access_key | string | required |            | AWS Secret Access Key |
+| workload_identity_federation.aws_session_token | string | optional   |                   | AWS Session Token (for temporary credentials) |
+| workload_identity_federation.aws_region | string | optional   | "ap-northeast-1"  | AWS Region |
+
+This plugin supports two access methods depending on the `config` content:
+
+- **Service Account Impersonation**: When `service_account_impersonation_url` is present in the config
+- **Direct Access**: When `service_account_impersonation_url` is not present in the config
+
+Example:
+
+```yaml
+out:
+  type: bigquery
+  auth_method: workload_identity_federation
+  workload_identity_federation:
+    config: /path/to/workload-identity-federation-config.json
+    aws_access_key_id: AKIAXXXXXXXXXXXXXXXX
+    aws_secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    aws_region: ap-northeast-1
+  project: my-project
+  dataset: my_dataset
+  table: my_table
+  source_format: NEWLINE_DELIMITED_JSON
 ```
 
 ### Table id formatting

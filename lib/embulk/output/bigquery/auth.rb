@@ -1,15 +1,17 @@
 require 'googleauth'
+require_relative 'workload_identity_federation_auth'
 
 module Embulk
   module Output
     class Bigquery < OutputPlugin
       class Auth
 
-        attr_reader :auth_method, :json_key, :scope
+        attr_reader :auth_method, :json_key, :workload_identity_federation, :scope
 
         def initialize(task, scope)
           @auth_method = task['auth_method']
           @json_key = task['json_keyfile']
+          @workload_identity_federation = task['workload_identity_federation']
           @scope = scope
         end
 
@@ -25,6 +27,8 @@ module Embulk
             return Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: key, scope: scope)
           when 'application_default'
             return Google::Auth.get_application_default([scope])
+          when 'workload_identity_federation'
+            return WorkloadIdentityFederationAuth.new(workload_identity_federation, [scope]).authenticate
           else
             raise ConfigError.new("Unknown auth method: #{auth_method}")
           end
