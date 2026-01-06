@@ -28,12 +28,22 @@ module Embulk
 
         def fetch_access_token_info
           aws_request = create_aws_signed_request
-          federated_token = exchange_token_for_google_access_token(aws_request)
-          result = impersonate_service_account(federated_token)
-          {
-            'access_token' => result['accessToken'],
-            'expire_time' => Time.parse(result['expireTime'])
-          }
+          sts_result = exchange_token_for_google_access_token(aws_request)
+
+          if @service_account_impersonation_url
+            Embulk.logger.info { "embulk-output-bigquery: Workload Identity Federation: Using service account impersonation" }
+            result = impersonate_service_account(sts_result['access_token'])
+            {
+              'access_token' => result['accessToken'],
+              'expire_time' => Time.parse(result['expireTime'])
+            }
+          else
+            Embulk.logger.info { "embulk-output-bigquery: Workload Identity Federation: Using direct access (no impersonation)" }
+            {
+              'access_token' => sts_result['access_token'],
+              'expire_time' => Time.now + sts_result['expires_in']
+            }
+          end
         end
 
         private
@@ -152,7 +162,10 @@ module Embulk
             safe_response = response_json.select { |k, _| %w[expires_in token_type issued_token_type].include?(k) }
             "embulk-output-bigquery: Token exchange response: #{safe_response.to_json}"
           }
-          response_json['access_token']
+          {
+            'access_token' => response_json['access_token'],
+            'expires_in' => response_json['expires_in']
+          }
         end
 
         # https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/generateAccessToken

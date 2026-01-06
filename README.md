@@ -297,7 +297,12 @@ This allows users to authenticate without storing Google Cloud service account k
 | workload_identity_federation.aws_session_token | string | optional   |                   | AWS Session Token (for temporary credentials) |
 | workload_identity_federation.aws_region | string | optional   | "ap-northeast-1"  | AWS Region |
 
-Example)
+This plugin supports two access methods depending on the `config` content:
+
+- **Service Account Impersonation**: When `service_account_impersonation_url` is present in the config
+- **Direct Access**: When `service_account_impersonation_url` is not present in the config
+
+Example:
 
 ```yaml
 out:
@@ -312,25 +317,6 @@ out:
   dataset: my_dataset
   table: my_table
   source_format: NEWLINE_DELIMITED_JSON
-```
-
-The `config` should contain the Workload Identity Federation configuration from Google Cloud:
-
-```json
-{
-  "universe_domain": "googleapis.com",
-  "type": "external_account",
-  "audience": "//iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID",
-  "subject_token_type": "urn:ietf:params:aws:token-type:aws4_request",
-  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/SERVICE_ACCOUNT@PROJECT.iam.gserviceaccount.com:generateAccessToken",
-  "token_url": "https://sts.googleapis.com/v1/token",
-  "credential_source": {
-    "environment_id": "aws1",
-    "region_url": "http://169.254.169.254/latest/meta-data/placement/availability-zone",
-    "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials",
-    "regional_cred_verification_url": "https://sts.{region}.amazonaws.com?Action=GetCallerIdentity&Version=2011-06-15"
-  }
-}
 ```
 
 ### Table id formatting
