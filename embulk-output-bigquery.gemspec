@@ -27,6 +27,14 @@ Gem::Specification.new do |spec|
   # googleauth 0.9.0 requires faraday ~> 0.12
   spec.add_dependency "faraday", '~> 0.12'
 
+  # AWS SDK for STS (AssumeRole for Role Chaining in WIF)
+  # Versions are pinned for JRuby 9.1.x (Ruby 2.3) compatibility.
+  # aws-sdk-sts >= 1.10.0 requires Ruby >= 2.5
+  # aws-sdk-core >= 3.131.0 requires Ruby >= 2.5
+  spec.add_dependency 'aws-sdk-sts', '= 1.9.0'
+  spec.add_dependency 'aws-sdk-core', '= 3.130.2'
+  spec.add_dependency 'aws-eventstream', '= 1.1.1'
+
   spec.add_development_dependency 'bundler', ['>= 1.10.6']
   spec.add_development_dependency 'rake', ['>= 10.0']
 end
