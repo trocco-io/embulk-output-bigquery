@@ -2,6 +2,7 @@ require 'net/http'
 require 'uri'
 require 'openssl'
 require 'json'
+require_relative 'aws_role_credentials_supplier'
 
 module Embulk
   module Output
@@ -10,11 +11,15 @@ module Embulk
         TOKEN_LIFETIME_SECONDS = 3600
 
         def initialize(config, scopes)
-          @aws_access_key_id = config['aws_access_key_id']
-          @aws_secret_access_key = config['aws_secret_access_key']
-          @aws_session_token = config['aws_session_token']
           @aws_region = config['aws_region'] || 'ap-northeast-1'
           @scopes = scopes
+
+          Embulk.logger.info { "embulk-output-bigquery: WIF using Role Chaining mode" }
+          @credentials_supplier = AwsRoleCredentialsSupplier.new(
+            role_arn: config['aws_role_arn'],
+            role_session_name: config['aws_role_session_name'],
+            region: @aws_region
+          )
 
           wif_config = JSON.parse(config['config'])
           @audience = wif_config['audience']
@@ -27,6 +32,9 @@ module Embulk
         end
 
         def fetch_access_token_info
+          # Supplierから最新の認証情報を取得
+          refresh_aws_credentials_from_supplier
+
           aws_request = create_aws_signed_request
           sts_result = exchange_token_for_google_access_token(aws_request)
 
@@ -47,6 +55,13 @@ module Embulk
         end
 
         private
+
+        def refresh_aws_credentials_from_supplier
+          credentials = @credentials_supplier.get_credentials
+          @aws_access_key_id = credentials['aws_access_key_id']
+          @aws_secret_access_key = credentials['aws_secret_access_key']
+          @aws_session_token = credentials['aws_session_token']
+        end
 
         def service_account_email
           parts = @service_account_impersonation_url.split('serviceAccounts/')

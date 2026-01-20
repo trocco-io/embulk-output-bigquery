@@ -148,12 +148,12 @@ module Embulk
           if wif['config'].nil?
             raise ConfigError.new "`workload_identity_federation.config` is required"
           end
-          if wif['aws_access_key_id'].nil?
-            raise ConfigError.new "`workload_identity_federation.aws_access_key_id` is required"
+
+          if wif['aws_role_arn'].nil?
+            raise ConfigError.new "`workload_identity_federation.aws_role_arn` is required for WIF authentication"
           end
-          if wif['aws_secret_access_key'].nil?
-            raise ConfigError.new "`workload_identity_federation.aws_secret_access_key` is required"
-          end
+          Embulk.logger.info { "embulk-output-bigquery: WIF configured (aws_role_arn: #{wif['aws_role_arn']})" }
+
           wif['aws_region'] ||= 'ap-northeast-1'
           wif['config'] = LocalFile.load(wif['config'])
         end

@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name          = "embulk-output-bigquery"
-  spec.version       = "0.7.5.trocco.0.0.5"
+  spec.version       = "0.7.5.trocco.0.0.6"
   spec.authors       = ["Satoshi Akama", "Naotoshi Seo"]
   spec.summary       = "Google BigQuery output plugin for Embulk"
   spec.description   = "Embulk plugin that insert records to Google BigQuery."
@@ -26,6 +26,14 @@ Gem::Specification.new do |spec|
   # faraday 1.1.0 require >= Ruby 2.4.
   # googleauth 0.9.0 requires faraday ~> 0.12
   spec.add_dependency "faraday", '~> 0.12'
+
+  # AWS SDK for STS (AssumeRole for Role Chaining in WIF)
+  # Versions are pinned for JRuby 9.1.x (Ruby 2.3) compatibility.
+  # aws-sdk-sts >= 1.10.0 requires Ruby >= 2.5
+  # aws-sdk-core >= 3.131.0 requires Ruby >= 2.5
+  spec.add_dependency 'aws-sdk-sts', '= 1.9.0'
+  spec.add_dependency 'aws-sdk-core', '= 3.130.2'
+  spec.add_dependency 'aws-eventstream', '= 1.1.1'
 
   spec.add_development_dependency 'bundler', ['>= 1.10.6']
   spec.add_development_dependency 'rake', ['>= 10.0']

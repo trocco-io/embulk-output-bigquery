@@ -286,16 +286,18 @@ out:
 
 #### workload\_identity\_federation
 
-Use Workload Identity Federation to authenticate using AWS credentials to access Google Cloud resources.
-This allows users to authenticate without storing Google Cloud service account keys by leveraging AWS IAM credentials.
+Use Workload Identity Federation to authenticate to Google Cloud resources.
+This allows users to authenticate without storing static credentials by leveraging AWS IAM Role Chaining.
 
-| name                                 | type        | required?  | default           | description            |
-|:-------------------------------------|:------------|:-----------|:------------------|:-----------------------|
-| workload_identity_federation.config | string | required   |                   | Path to the Workload Identity Federation JSON config file or `content` |
-| workload_identity_federation.aws_access_key_id | string | required |                | AWS Access Key ID |
-| workload_identity_federation.aws_secret_access_key | string | required |            | AWS Secret Access Key |
-| workload_identity_federation.aws_session_token | string | optional   |                   | AWS Session Token (for temporary credentials) |
-| workload_identity_federation.aws_region | string | optional   | "ap-northeast-1"  | AWS Region |
+The plugin uses AWS AssumeRole to obtain temporary credentials from the base credentials (IRSA, ECS Task Role, etc.),
+and automatically refreshes them before expiration (1-hour session limit with 5-minute refresh threshold).
+
+| name                                 | type        | required?  | default                  | description            |
+|:-------------------------------------|:------------|:-----------|:-------------------------|:-----------------------|
+| workload_identity_federation.config | string | required   |                          | Path to the Workload Identity Federation JSON config file or `content` |
+| workload_identity_federation.aws_role_arn | string | required |                      | ARN of the AWS IAM Role to assume |
+| workload_identity_federation.aws_role_session_name | string | optional | "embulk-bigquery-session" | Session name for AssumeRole |
+| workload_identity_federation.aws_region | string | optional   | "ap-northeast-1"         | AWS Region |
 
 This plugin supports two access methods depending on the `config` content:
 
@@ -310,8 +312,8 @@ out:
   auth_method: workload_identity_federation
   workload_identity_federation:
     config: /path/to/workload-identity-federation-config.json
-    aws_access_key_id: AKIAXXXXXXXXXXXXXXXX
-    aws_secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    aws_role_arn: arn:aws:iam::123456789012:role/my-wif-role
+    aws_role_session_name: embulk-bigquery-session
     aws_region: ap-northeast-1
   project: my-project
   dataset: my_dataset
