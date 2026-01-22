@@ -543,9 +543,10 @@ module Embulk
         end
 
         # update only column.description
-        def patch_table
+        def patch_table(target_table = nil)
+          target_table ||= @task['table']
           with_job_retry do
-            table = get_table(@task['table'])
+            table = get_table(target_table)
 
             def patch_description_and_policy_tags(fields, column_options, src_fields)
               fields.map do |field|
@@ -573,7 +574,7 @@ module Embulk
 
             fields = patch_description_and_policy_tags(table.schema.fields, @task['column_options'], @src_fields)
             table.schema.update!(fields: fields)
-            table_id = Helper.chomp_partition_decorator(@task['table'])
+            table_id = Helper.chomp_partition_decorator(target_table)
             with_network_retry { client.patch_table(@destination_project, @dataset, table_id, table) }
           end
         end
