@@ -467,6 +467,14 @@ module Embulk
               end
             end
 
+            # Policy Tag permission check on temp table before copying to destination table
+            # This ensures that if policy tag application fails due to permission issues,
+            # the destination table remains unchanged
+            if task['temp_table'] && task['mode'] == 'replace' && task['retain_column_policy_tags']
+              Embulk.logger.info { "embulk-output-bigquery: checking policy tag permissions on temp table" }
+              bigquery.patch_table(task['temp_table'])
+            end
+
             if task['temp_table']
               case task['mode']
               when 'merge'
