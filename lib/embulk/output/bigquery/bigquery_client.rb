@@ -589,7 +589,7 @@ module Embulk
                UPDATE SET #{join_merge_rule_or_columns(merge_rule, columns)}
              WHEN NOT MATCHED THEN
                INSERT (#{join_columns(columns)})
-               VALUES (#{join_columns(columns, 'S')})
+               VALUES (#{join_columns(columns)})
           EOD
           Embulk.logger.info { "embulk-output-bigquery: Execute query... #{query.gsub(/\s+/, ' ')}" }
           execute_query(query)
@@ -655,12 +655,8 @@ module Embulk
           merge_rule_or_columns.join(", ")
         end
 
-        def join_columns(columns, table_alias = nil)
-          if table_alias
-            columns.map { |column| "#{table_alias}.`#{column}`" }.join(", ")
-          else
-            columns.map { |column| "`#{column}`" }.join(", ")
-          end
+        def join_columns(columns)
+          columns.map { |column| "`#{column}`" }.join(", ")
         end
 
         def execute_query(query)
