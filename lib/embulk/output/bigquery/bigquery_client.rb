@@ -579,6 +579,29 @@ module Embulk
           end
         end
 
+        # Remove policy tags from a table to allow copy operation by users who can apply but not read policy-tagged data
+        def clear_policy_tags(target_table)
+          with_job_retry do
+            table = get_table(target_table)
+
+            def clear_policy_tags_from_fields(fields)
+              fields.map do |field|
+                field.update!(policy_tags: nil) if field.policy_tags
+                if field.fields
+                  nested_fields = clear_policy_tags_from_fields(field.fields)
+                  field.update!(fields: nested_fields)
+                end
+                field
+              end
+            end
+
+            fields = clear_policy_tags_from_fields(table.schema.fields)
+            table.schema.update!(fields: fields)
+            table_id = Helper.chomp_partition_decorator(target_table)
+            with_network_retry { client.patch_table(@destination_project, @dataset, table_id, table) }
+          end
+        end
+
         def merge(source_table, target_table, merge_keys, merge_rule)
           columns = @schema.map { |column| column[:name] }
           query = <<~EOD
