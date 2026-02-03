@@ -586,7 +586,10 @@ module Embulk
 
             def clear_policy_tags_from_fields(fields)
               fields.map do |field|
-                field.update!(policy_tags: nil) if field.policy_tags
+                if field.policy_tags
+                  # Set empty names array to remove policy tags
+                  field.policy_tags.update!(names: [])
+                end
                 if field.fields
                   nested_fields = clear_policy_tags_from_fields(field.fields)
                   field.update!(fields: nested_fields)
