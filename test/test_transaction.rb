@@ -162,6 +162,7 @@ module Embulk
             mock(obj).create_table_if_not_exists(config['temp_table'], options: {"expiration_time"=>nil})
             mock(obj).create_table_if_not_exists(config['table'])
             mock(obj).patch_table(config['temp_table'])  # Policy tag permission check on temp table
+            mock(obj).clear_policy_tags(config['temp_table'])  # Clear policy tags before copy
             mock(obj).copy(config['temp_table'], config['table'], write_disposition: 'WRITE_TRUNCATE')
             mock(obj).delete_table(config['temp_table'])
             mock(obj).patch_table  # Apply policy tags to destination table
