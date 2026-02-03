@@ -473,6 +473,10 @@ module Embulk
             if task['temp_table'] && task['mode'] == 'replace' && task['retain_column_policy_tags']
               Embulk.logger.info { "embulk-output-bigquery: checking policy tag permissions on temp table" }
               bigquery.patch_table(task['temp_table'])
+              # Remove policy tags from temp table before copy to avoid access denied error
+              # Users with Policy Tag Admin role can apply tags but cannot read tagged data
+              Embulk.logger.info { "embulk-output-bigquery: clearing policy tags from temp table before copy" }
+              bigquery.clear_policy_tags(task['temp_table'])
             end
 
             if task['temp_table']
