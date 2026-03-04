@@ -384,7 +384,14 @@ Column options are used to aid guessing BigQuery schema, or to define conversion
     - json:      `STRING`,  `RECORD` (default: `STRING`)
     - numeric:   `STRING`
   - **mode**: BigQuery mode such as `NULLABLE`, `REQUIRED`, and `REPEATED` (string, default: `NULLABLE`)
-  - **fields**: Describes the nested schema fields if the type property is set to RECORD. Please note that this is **required** for `RECORD` column.
+  - **fields**: Describes the nested schema fields if the type property is set to RECORD. Please note that this is **required** for `RECORD` column. Each field supports the following options:
+    - **name**: field name (required)
+    - **type**: BigQuery type such as `BOOLEAN`, `INTEGER`, `FLOAT`, `STRING`, `TIMESTAMP`, `DATETIME`, `DATE`, `TIME`, `RECORD`, and `NUMERIC` (required)
+    - **mode**: `NULLABLE`, `REQUIRED`, or `REPEATED` (string, default: `NULLABLE`)
+    - **timestamp_format**: timestamp format for `TIMESTAMP`, `DATETIME` fields (string, default is `default_timestamp_format`)
+    - **timezone**: timezone for `TIMESTAMP`, `DATE` fields (string, default is `default_timezone`)
+    - **fields**: nested schema fields for `RECORD` type (recursive)
+    - **description**: description for the field
   - **description**: description (string, default is `None`).
   - **timestamp_format**: timestamp format to convert into/from `timestamp` (string, default is `default_timestamp_format`)
   - **timezone**: timezone to convert into/from `timestamp`, `date` (string, default is `default_timezone`).
@@ -405,7 +412,12 @@ out:
       type: RECORD
       fields:
         - {name: key1, type: STRING}
-        - {name: key2, type: STRING}
+        - {name: key2, type: TIMESTAMP, timestamp_format: "%Y-%m-%dT%H:%M:%S", timezone: "Asia/Tokyo"}
+        - name: nested
+          type: RECORD
+          fields:
+            - {name: value, type: STRING}
+            - {name: created_at, type: TIMESTAMP, timestamp_format: "%Y-%m-%d %H:%M:%S"}
 ```
 
 NOTE: Type conversion is done in this jruby plugin, and could be slow. See [Formatter Performance Issue](#formatter-performance-issue) to improve the performance.
