@@ -44,7 +44,12 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.7
-      - name: Push gem
+      - name: Add commit hash suffix to version
+        run: |
+          commit_hash="${GITHUB_SHA:0:7}"
+          sed -ie "s/\(spec\.version \+= \+\"[^\"]\+\)/\1.${commit_hash}.pre/g" *.gemspec
+          grep spec.version *.gemspec
+      - name: Build and push gem
         uses: trocco-io/push-gem-to-gpr-action@v2
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
