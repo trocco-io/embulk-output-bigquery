@@ -8,3 +8,4 @@ vendor/
 .tags
 your-project-000.json
 embulk.jar
+.idea
