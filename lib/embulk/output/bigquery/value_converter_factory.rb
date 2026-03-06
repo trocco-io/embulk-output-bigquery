@@ -255,7 +255,7 @@ module Embulk
             Proc.new {|val|
               next nil if val.nil?
               with_typecast_error(val) do |val|
-                BigDecimal(val).round(@scale, BigDecimal::ROUND_CEILING)
+                BigDecimal(val.to_s).round(@scale, BigDecimal::ROUND_CEILING)
               end
             }
           else
@@ -340,7 +340,7 @@ module Embulk
             mode = (field_config['mode'] || 'NULLABLE').upcase
             # Nested RECORD values are already Hashes from JSON.parse, use :json
             # Other values come as strings/primitives from JSON, use :string
-            source_type = type == 'RECORD' ? :json : :string
+            source_type = ['RECORD', 'JSON'].include?(type) ? :json : :string
 
             converter = self.class.new(
               source_type, type,
