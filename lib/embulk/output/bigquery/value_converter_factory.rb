@@ -39,7 +39,8 @@ module Embulk
               strict: column_option['strict'],
               default_timestamp_format: default_timestamp_format,
               default_timezone: default_timezone,
-              scale: scale
+              scale: scale,
+              fields: column_option['fields']
             ).create_converter
           end
         end
@@ -51,16 +52,19 @@ module Embulk
           timestamp_format: nil, timezone: nil, strict: nil,
           default_timestamp_format: DEFAULT_TIMESTAMP_FORMAT,
           default_timezone: DEFAULT_TIMEZONE,
-          scale: DEFAULT_SCALE
+          scale: DEFAULT_SCALE,
+          fields: nil
         )
           @embulk_type      = embulk_type
           @type             = (type || Helper.bq_type_from_embulk_type(embulk_type)).upcase
           @timestamp_format = timestamp_format
           @default_timestamp_format = default_timestamp_format
+          @default_timezone = default_timezone
           @timezone         = timezone || default_timezone
           @zone_offset      = TimeWithZone.zone_offset(@timezone)
           @strict           = strict.nil? ? true : strict
           @scale            = scale
+          @fields           = fields
         end
 
         def create_converter
@@ -173,8 +177,8 @@ module Embulk
           when 'BOOLEAN'
             Proc.new {|val|
               next nil if val.nil?
-              next true if val == 'true'.freeze
-              next false if val == 'false'.freeze
+              next true if (val == true) || (val == 'true'.freeze)
+              next false if (val == false) || (val == 'false'.freeze)
               raise_typecast_error(val)
             }
           when 'INTEGER'
@@ -239,17 +243,19 @@ module Embulk
               end
             }
           when 'RECORD'
+            record_field_converters = build_record_field_converters
             Proc.new {|val|
               next nil if val.nil?
               with_typecast_error(val) do |val|
-                JSON.parse(val)
+                parsed = JSON.parse(val)
+                apply_field_converters(parsed, record_field_converters)
               end
             }
           when 'NUMERIC'
             Proc.new {|val|
               next nil if val.nil?
               with_typecast_error(val) do |val|
-                BigDecimal(val).round(@scale, BigDecimal::ROUND_CEILING)
+                BigDecimal(val.to_s).round(@scale, BigDecimal::ROUND_CEILING)
               end
             }
           else
@@ -302,7 +308,6 @@ module Embulk
           end
         end
 
-        # ToDo: recursive conversion
         def json_converter
           case type
           when 'STRING'
@@ -311,8 +316,10 @@ module Embulk
               val.to_json
             }
           when 'RECORD'
+            record_field_converters = build_record_field_converters
             Proc.new {|val|
-              val
+              next nil if val.nil?
+              apply_field_converters(val, record_field_converters)
             }
           when 'JSON'
             Proc.new {|val|
@@ -320,6 +327,56 @@ module Embulk
             }
           else
             raise NotSupportedType, "cannot take column type #{type} for json column"
+          end
+        end
+
+        def build_record_field_converters
+          return {} unless @fields.is_a?(Array) && !@fields.empty?
+
+          converters = {}
+          @fields.each do |field_config|
+            name = field_config['name']
+            type = field_config['type'].upcase
+            mode = (field_config['mode'] || 'NULLABLE').upcase
+            # Nested RECORD values are already Hashes from JSON.parse, use :json
+            # Other values come as strings/primitives from JSON, use :string
+            source_type = ['RECORD', 'JSON'].include?(type) ? :json : :string
+
+            converter = self.class.new(
+              source_type, type,
+              timestamp_format: field_config['timestamp_format'],
+              timezone: field_config['timezone'],
+              strict: @strict,
+              default_timestamp_format: @default_timestamp_format,
+              default_timezone: @default_timezone,
+              scale: @scale,
+              fields: field_config['fields']
+            ).create_converter
+
+            if mode == 'REPEATED'
+              converters[name] = Proc.new {|val|
+                next nil if val.nil?
+                val.map {|v| converter.call(v) }
+              }
+            else
+              converters[name] = converter
+            end
+          end
+          converters
+        end
+
+        def apply_field_converters(data, field_converters)
+          return data if field_converters.empty?
+
+          if data.is_a?(Array)
+            data.map {|element| apply_field_converters(element, field_converters) }
+          elsif data.is_a?(Hash)
+            field_converters.each do |name, converter|
+              data[name] = converter.call(data[name]) if data.key?(name)
+            end
+            data
+          else
+            data
           end
         end
       end

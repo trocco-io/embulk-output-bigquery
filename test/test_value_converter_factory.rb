@@ -439,6 +439,258 @@ module Embulk
         converter = ValueConverterFactory.new(:string, 'INTEGER', strict: false).create_converter
         assert_equal nil, converter.call('foo')
       end
+
+      class TestRecordFieldConverters < Test::Unit::TestCase
+        def build_converter(source_type, fields)
+          ValueConverterFactory.new(source_type, 'RECORD', fields: fields).create_converter
+        end
+
+        # 1. ソース型別の基本動作
+
+        def test_string_to_record_with_fields
+          fields = [
+            {'name' => 'key', 'type' => 'STRING', 'mode' => 'NULLABLE'},
+            {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+          ]
+          converter = build_converter(:string, fields)
+
+          result = converter.call('{"key":"val","ts":"2024-01-15T10:30:00"}')
+          assert_equal 'val', result['key']
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result['ts']
+        end
+
+        def test_json_to_record_with_fields
+          fields = [
+            {'name' => 'key', 'type' => 'STRING', 'mode' => 'NULLABLE'},
+            {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+          ]
+          converter = build_converter(:json, fields)
+
+          result = converter.call({'key' => 'val', 'ts' => '2024-01-15T10:30:00'})
+          assert_equal 'val', result['key']
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result['ts']
+        end
+
+        def test_nil_input
+          fields = [
+            {'name' => 'key', 'type' => 'STRING', 'mode' => 'NULLABLE'},
+          ]
+          assert_equal nil, build_converter(:string, fields).call(nil)
+          assert_equal nil, build_converter(:json, fields).call(nil)
+        end
+
+        # 2. フィールド型別（JSON.parse後のRubyネイティブ型が入力）
+
+        def test_field_type_string
+          fields = [{'name' => 'v', 'type' => 'STRING', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":"hello"}')
+          assert_equal 'hello', result['v']
+        end
+
+        def test_field_type_integer
+          fields = [{'name' => 'v', 'type' => 'INTEGER', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":42}')
+          assert_equal 42, result['v']
+        end
+
+        def test_field_type_float
+          fields = [{'name' => 'v', 'type' => 'FLOAT', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":3.14}')
+          assert_equal 3.14, result['v']
+        end
+
+        def test_field_type_boolean
+          fields = [{'name' => 'v', 'type' => 'BOOLEAN', 'mode' => 'NULLABLE'}]
+          converter = build_converter(:string, fields)
+
+          result = converter.call('{"v":true}')
+          assert_equal true, result['v']
+
+          result = converter.call('{"v":false}')
+          assert_equal false, result['v']
+        end
+
+        def test_field_type_timestamp_with_format
+          fields = [{'name' => 'v', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15T10:30:00"}')
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result['v']
+        end
+
+        def test_field_type_timestamp_without_format
+          fields = [{'name' => 'v', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15 10:30:00"}')
+          assert_equal '2024-01-15 10:30:00', result['v']
+        end
+
+        def test_field_type_date
+          fields = [{'name' => 'v', 'type' => 'DATE', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15 10:30:00"}')
+          assert_equal '2024-01-15', result['v']
+        end
+
+        def test_field_type_datetime_with_format
+          fields = [{'name' => 'v', 'type' => 'DATETIME', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y/%m/%d %H:%M:%S'}]
+          result = build_converter(:string, fields).call('{"v":"2024/01/15 10:30:00"}')
+          assert_equal '2024-01-15 10:30:00.000000', result['v']
+        end
+
+        def test_field_type_datetime_without_format
+          fields = [{'name' => 'v', 'type' => 'DATETIME', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15 10:30:00"}')
+          assert_equal '2024-01-15 10:30:00', result['v']
+        end
+
+        def test_field_type_time
+          fields = [{'name' => 'v', 'type' => 'TIME', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":"15:30:00"}')
+          assert_equal '15:30:00.000000', result['v']
+        end
+
+        # 3. オプション（timezone）
+
+        def test_field_timestamp_with_timezone
+          fields = [{'name' => 'v', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%d', 'timezone' => 'Asia/Tokyo'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15"}')
+          assert_equal '2024-01-15 00:00:00.000000 +09:00', result['v']
+        end
+
+        def test_field_timestamp_without_timezone_uses_default
+          fields = [{'name' => 'v', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%d'}]
+          result = build_converter(:string, fields).call('{"v":"2024-01-15"}')
+          assert_equal '2024-01-15 00:00:00.000000 +00:00', result['v']
+        end
+
+        # 4. mode
+
+        def test_repeated_string
+          fields = [{'name' => 'v', 'type' => 'STRING', 'mode' => 'REPEATED'}]
+          result = build_converter(:string, fields).call('{"v":["a","b","c"]}')
+          assert_equal ['a', 'b', 'c'], result['v']
+        end
+
+        def test_repeated_timestamp
+          fields = [{'name' => 'v', 'type' => 'TIMESTAMP', 'mode' => 'REPEATED', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'}]
+          result = build_converter(:string, fields).call('{"v":["2024-01-15T10:30:00","2024-02-20T15:00:00"]}')
+          assert_equal [
+            '2024-01-15 10:30:00.000000 +00:00',
+            '2024-02-20 15:00:00.000000 +00:00',
+          ], result['v']
+        end
+
+        def test_repeated_nil
+          fields = [{'name' => 'v', 'type' => 'STRING', 'mode' => 'REPEATED'}]
+          result = build_converter(:string, fields).call('{"v":null}')
+          assert_equal nil, result['v']
+        end
+
+        # 5. 再帰（ネストRECORD）
+
+        def test_nested_record
+          fields = [
+            {'name' => 'inner', 'type' => 'RECORD', 'mode' => 'NULLABLE', 'fields' => [
+              {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S', 'timezone' => 'Asia/Tokyo'},
+            ]},
+          ]
+          result = build_converter(:string, fields).call('{"inner":{"ts":"2024-01-15T10:30:00"}}')
+          assert_equal '2024-01-15 10:30:00.000000 +09:00', result['inner']['ts']
+        end
+
+        def test_repeated_nested_record
+          fields = [
+            {'name' => 'items', 'type' => 'RECORD', 'mode' => 'REPEATED', 'fields' => [
+              {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+            ]},
+          ]
+          result = build_converter(:string, fields).call('{"items":[{"ts":"2024-01-15T10:30:00"},{"ts":"2024-02-20T15:00:00"}]}')
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result['items'][0]['ts']
+          assert_equal '2024-02-20 15:00:00.000000 +00:00', result['items'][1]['ts']
+        end
+
+        # 6. エッジケース
+
+        def test_record_without_fields
+          converter = ValueConverterFactory.new(:string, 'RECORD').create_converter
+          assert_equal({'foo' => 'bar'}, converter.call('{"foo":"bar"}'))
+        end
+
+        def test_field_missing_in_data
+          fields = [
+            {'name' => 'key', 'type' => 'STRING', 'mode' => 'NULLABLE'},
+            {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+          ]
+          result = build_converter(:string, fields).call('{"key":"hello"}')
+          assert_equal 'hello', result['key']
+          assert_false result.key?('ts')
+        end
+
+        def test_top_level_data_is_array
+          fields = [
+            {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+          ]
+          result = build_converter(:string, fields).call('[{"ts":"2024-01-15T10:30:00"},{"ts":"2024-02-20T15:00:00"}]')
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result[0]['ts']
+          assert_equal '2024-02-20 15:00:00.000000 +00:00', result[1]['ts']
+        end
+
+        # 7. strict / scale の伝播
+
+        def test_strict_false_propagates_to_nested_fields
+          fields = [
+            {'name' => 'v', 'type' => 'INTEGER', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', strict: false, fields: fields).create_converter
+
+          result = converter.call('{"v":"not_a_number"}')
+          assert_equal nil, result['v']
+        end
+
+        def test_strict_true_propagates_to_nested_fields
+          fields = [
+            {'name' => 'v', 'type' => 'INTEGER', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', strict: true, fields: fields).create_converter
+
+          assert_raise(ValueConverterFactory::TypeCastError) do
+            converter.call('{"v":"not_a_number"}')
+          end
+        end
+
+        def test_scale_propagates_to_nested_numeric_fields
+          fields = [
+            {'name' => 'v', 'type' => 'NUMERIC', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', scale: 2, fields: fields).create_converter
+
+          result = converter.call('{"v":"1.2345"}')
+          assert_equal BigDecimal('1.24'), result['v']
+        end
+
+        # 8. 統合テスト
+
+        def test_create_converters_with_record_fields
+          schema = Schema.new([
+            Column.new({index: 0, name: 'data', type: :json}),
+          ])
+          task = {
+            'column_options' => [
+              {
+                'name' => 'data',
+                'type' => 'RECORD',
+                'fields' => [
+                  {'name' => 'ts', 'type' => 'TIMESTAMP', 'mode' => 'NULLABLE', 'timestamp_format' => '%Y-%m-%dT%H:%M:%S'},
+                  {'name' => 'key', 'type' => 'STRING', 'mode' => 'NULLABLE'},
+                ],
+              },
+            ],
+          }
+          converters = ValueConverterFactory.create_converters(task, schema)
+
+          result = converters[0].call({'ts' => '2024-01-15T10:30:00', 'key' => 'hello'})
+          assert_equal '2024-01-15 10:30:00.000000 +00:00', result['ts']
+          assert_equal 'hello', result['key']
+        end
+      end
+
     end
   end
 end
