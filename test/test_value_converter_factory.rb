@@ -632,7 +632,40 @@ module Embulk
           assert_equal '2024-02-20 15:00:00.000000 +00:00', result[1]['ts']
         end
 
-        # 7. 統合テスト
+        # 7. strict / scale の伝播
+
+        def test_strict_false_propagates_to_nested_fields
+          fields = [
+            {'name' => 'v', 'type' => 'INTEGER', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', strict: false, fields: fields).create_converter
+
+          result = converter.call('{"v":"not_a_number"}')
+          assert_equal nil, result['v']
+        end
+
+        def test_strict_true_propagates_to_nested_fields
+          fields = [
+            {'name' => 'v', 'type' => 'INTEGER', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', strict: true, fields: fields).create_converter
+
+          assert_raise(ValueConverterFactory::TypeCastError) do
+            converter.call('{"v":"not_a_number"}')
+          end
+        end
+
+        def test_scale_propagates_to_nested_numeric_fields
+          fields = [
+            {'name' => 'v', 'type' => 'NUMERIC', 'mode' => 'NULLABLE'},
+          ]
+          converter = ValueConverterFactory.new(:string, 'RECORD', scale: 2, fields: fields).create_converter
+
+          result = converter.call('{"v":"1.2345"}')
+          assert_equal BigDecimal('1.24'), result['v']
+        end
+
+        # 8. 統合テスト
 
         def test_create_converters_with_record_fields
           schema = Schema.new([

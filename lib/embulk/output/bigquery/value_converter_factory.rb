@@ -346,8 +346,10 @@ module Embulk
               source_type, type,
               timestamp_format: field_config['timestamp_format'],
               timezone: field_config['timezone'],
+              strict: @strict,
               default_timestamp_format: @default_timestamp_format,
               default_timezone: @default_timezone,
+              scale: @scale,
               fields: field_config['fields']
             ).create_converter
 
