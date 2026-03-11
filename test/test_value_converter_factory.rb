@@ -226,6 +226,16 @@ module Embulk
           assert_equal "foo", converter.call("foo")
         end
 
+        def test_string_with_hash_value
+          converter = ValueConverterFactory.new(SCHEMA_TYPE, 'STRING').create_converter
+          assert_equal '{"key":"value"}', converter.call({"key" => "value"})
+        end
+
+        def test_string_with_array_value
+          converter = ValueConverterFactory.new(SCHEMA_TYPE, 'STRING').create_converter
+          assert_equal '[1,2,3]', converter.call([1, 2, 3])
+        end
+
         def test_timestamp
           converter = ValueConverterFactory.new(
             SCHEMA_TYPE, 'TIMESTAMP',
@@ -611,6 +621,18 @@ module Embulk
         def test_record_without_fields
           converter = ValueConverterFactory.new(:string, 'RECORD').create_converter
           assert_equal({'foo' => 'bar'}, converter.call('{"foo":"bar"}'))
+        end
+
+        def test_field_type_string_with_json_object_value
+          fields = [{'name' => 'v', 'type' => 'STRING', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":{"key":"value","nested":[1,2,3]}}')
+          assert_equal '{"key":"value","nested":[1,2,3]}', result['v']
+        end
+
+        def test_field_type_string_with_array_value
+          fields = [{'name' => 'v', 'type' => 'STRING', 'mode' => 'NULLABLE'}]
+          result = build_converter(:string, fields).call('{"v":["a","b","c"]}')
+          assert_equal '["a","b","c"]', result['v']
         end
 
         def test_field_missing_in_data

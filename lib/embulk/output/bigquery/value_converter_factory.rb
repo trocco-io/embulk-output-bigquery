@@ -197,7 +197,8 @@ module Embulk
             }
           when 'STRING'
             Proc.new {|val|
-              val
+              next nil if val.nil?
+              val.is_a?(Hash) || val.is_a?(Array) ? val.to_json : val
             }
           when 'TIMESTAMP'
             if @timestamp_format
